@@ -834,3 +834,332 @@ EXPIRED - истекла
 
 Получает с 11 по 20 (`pageNumber=1&pageSize=10`) необработанные выплаты (`orderStatus=PENDING`) отсортированные по ключу
 внешней выплаты (`fieldNameSort=externalId`)
+
+## Эквайринг
+
+### Создать заявку
+
+`POST /acquiring`
+
+* В случае успеха, возвращается информация о заявке.
+
+* В процессе обработки могут происходить ошибки. В это случае ответ будет с кодом 4XX и текстом ошибки
+
+**Параметры:** Штамп времени в строке запроса
+
+Тело запроса:
+
+| Параметр           | Тип     | Обязательный | Примечание                                              |
+|--------------------|---------|--------------|---------------------------------------------------------|
+| externalId         | string  | Да           | Внешний ключ выплаты                                    |
+| amount             | decimal | Да           | Сумма выплаты                                           |
+| currency           | string  | Да           | Код валюты выплаты                                      |
+| callbackUrl        | string  | Нет          | URL оповещения                                          |
+| clientInfo         | string  | Нет          | Информация о клиенте(опциональная информация о клиенте) |
+| cardNumber         | string  | Да           | Номер карты                                             |
+| cardExpirationDate | string  | Нет          | Дата окончания действия карты                           |
+| cardHolder         | string  | Нет          | Держатель карты                                         |
+| cardCvv            | string  | Нет          | CVV код карты                                           |
+
+Пример запроса:
+`/api/acquiring?timestamp=2024-05-04T12:38:25`
+
+#### Создание выплаты
+
+```<json>   
+{
+    "externalId": "37",
+    "amount": 100,
+    "currency": "USD",
+    "callbackUrl": "https://site.com/pay/result",
+    "clientInfo": "User777",
+    "cardNumber": "1234123412341234",
+    "cardExpirationDate": "12/2025",
+    "cardHolder": "IVAN IVANOV",
+    "cardCvv": "123"
+}
+```
+
+Ответ (статус код 200):
+
+```<json>   
+{
+    "success": true,
+    "result": {
+        "hash": "01dd1a6d-538a-4c4d-bb38-bc128d39f528",
+        "externalId": "37",
+        "currencyCode": "USD",
+        "amount": 100.00,
+        "callbackUrl": "https://site.com/pay/result",
+        "clientInfo": "User777",
+        "createdAt": "2024-06-28T15:45:02.968357964+03:00",
+        "status": "DETAILS_RECEIVED",
+        "cardNumber": "1234123412341234",
+        "cardExpirationDate": "12/2025",
+        "cardHolder": "IVAN IVANOV",
+        "cardCvv": "123"
+    }
+}
+```
+
+В ответе возвращается информация по выплате.
+
+* `hash` - идентификатор присвоенный заявке в нашей системе
+* `externalId` - идентификатор переданный внешней системой
+* `status` - статус заявки
+
+статус может быть
+
+```
+CREATED - заявка создана(в текущей версии не используется)
+DETAILS_RECEIVED - переданы данные карты,
+WAITING_CODE - ожидается 3ds код от пользователя,
+CODE_RECEIVED - код получен
+SUCCESS - заявка закрыта успешно
+CANCELED - заявка закрыта НЕуспешно
+EXPIRED - заявка истекла(в текущей версии не используется)
+```
+
+Ответ (статус код 4XX):
+
+```<json>   
+{
+    "success": false,
+    "error": [
+        {
+            "errorType": "VALIDATION",
+            "message": "Валюта не найдена в системе"
+        }
+    ]
+}
+```
+
+Ответ (статус код 4XX):
+
+```<json>   
+{
+    "success": false,
+    "error": [
+        {
+            "errorType": "VALIDATION",
+            "message": "Заявка с внешним идентификатором 36 уже существует в системе"
+        }
+    ]
+}
+```
+
+### Передать 3ds код по заявке
+
+`POST /acquiring/code`
+
+**Параметры:** Штамп времени в строке запроса
+
+Тело запроса:
+
+| Параметр | Тип    | Обязательный | Примечание  |
+|----------|--------|--------------|-------------|
+| hash     | string | Да           | Хэш выплаты |
+| code     | string | Да           | 3ds код     |
+
+Пример запроса:
+`/api/acquiring?timestamp=2024-05-04T13:24:42`
+
+```<json>   
+{
+    "hash": "01dd1a6d-538a-4c4d-bb38-bc128d39f528",
+    "code": "123456"
+}
+```
+
+Ответ (статус код 200):
+
+```<json>   
+{
+    "success": true,
+    "result": "OK"
+}
+```
+
+Ответ (статус код 4XX):
+
+```<json>   
+{
+    "success": false,
+    "error": [
+        {
+            "errorType": "VALIDATION",
+            "message": "Заявка должна быть в статусе WAITING_CODE"
+        }
+    ]
+}
+```
+
+### Получить заявку по хешу
+
+`GET /acquiring/{hash}`
+
+* В случае успеха, возвращается информация о заявке.
+
+* В процессе обработки могут происходить ошибки. В это случае ответ будет с кодом 4XX и текстом ошибки
+
+* Параметр `hash` указывается в строке запроса
+
+Пример запроса:
+`/api/acquiring/01dd1a6d-538a-4c4d-bb38-bc128d39f528?timestamp=2024-05-04T13:24:42`
+
+Ответ (статус код 200):
+
+```<json>   
+{
+    "success": true,
+    "result": {
+        "hash": "01dd1a6d-538a-4c4d-bb38-bc128d39f528",
+        "externalId": "37",
+        "currencyCode": "USD",
+        "amount": 100.0000000000,
+        "callbackUrl": "https://site.com/pay/result",
+        "clientInfo": "User777",
+        "createdAt": "2024-06-28T12:45:02.968358Z",
+        "status": "DETAILS_RECEIVED",
+        "cardNumber": "1234123412341234",
+        "cardExpirationDate": "12/2025",
+        "cardHolder": "IVAN IVANOV",
+        "cardCvv": "123"
+    }
+}
+```
+
+Ответ (статус код 4XX):
+
+```<json>   
+{
+    "success": false,
+    "error": [
+        {
+            "errorType": "VALIDATION",
+            "message": "Заявка по хэшу не найдена в системе"
+        }
+    ]
+}
+```
+
+### Получить заявку по внешнему ключу
+
+`GET /acquiring/ext/{externalId}`
+
+* В случае успеха, возвращается информация о заявке.
+
+* В процессе обработки могут происходить ошибки. В это случае ответ будет с кодом 4XX и текстом ошибки
+
+* Параметр `externalId` указывается в строке запроса
+
+Пример запроса:
+`/api/acquiring/ext/37?timestamp=2024-05-04T13:43:28`
+
+Ответ (статус код 200):
+
+```<json>   
+{
+    "success": true,
+    "result": {
+        "hash": "01dd1a6d-538a-4c4d-bb38-bc128d39f528",
+        "externalId": "37",
+        "currencyCode": "USD",
+        "amount": 100.0000000000,
+        "callbackUrl": "https://site.com/pay/result",
+        "clientInfo": "User777",
+        "createdAt": "2024-06-28T12:45:02.968358Z",
+        "status": "DETAILS_RECEIVED",
+        "cardNumber": "1234123412341234",
+        "cardExpirationDate": "12/2025",
+        "cardHolder": "IVAN IVANOV",
+        "cardCvv": "123"
+    }
+}
+```
+
+Ответ (статус код 4XX):
+
+```<json>   
+{
+    "success": false,
+    "error": [
+        {
+            "errorType": "VALIDATION",
+            "message": "Заявка по внешнему ID не найдена в системе"
+        }
+    ]
+}
+```
+
+### Получить заявки по фильтру
+
+`GET /acquiring`
+
+* Все фильтры указываются в параметрах запроса
+* Из обязательных параметров только `timestamp`
+* В этом методе поддерживается механизм пагинации. За это отвечают параметры `pageNumber` и `pageSize`
+* В этом методе поддерживается механизм сортировки совместно с пагинацией. За это отвечают параметры `fieldNameSort`
+  и `isDescSort`
+* В случае успеха, возвращаются выплаты в формате:
+
+```json
+{
+  "success": true,
+  "result": {
+    "elements": [
+      ...
+    ],
+    "totalElements": 2,
+    "totalPages": 1,
+    "currentPages": 0
+  }
+}
+```
+
+| Свойство      | Описание                                    |
+|---------------|---------------------------------------------|
+| elements      | массив заявок который описан выше           |
+| totalElements | общее количество найденных элементов        |
+| totalPages    | общее количество страниц размера `pageSize` |
+| currentPages  | текущая страница                            |
+
+Параметры запроса
+
+**Параметры:** Штамп времени в строке запроса
+
+| Параметр      | Тип      | Обязательный | Примечание                           |
+|---------------|----------|--------------|--------------------------------------|
+| timestamp     | DateTime | Да           | Штамп времени                        |
+| hash          | string   | Нет          | Отфильтровать по хешу выплаты        |
+| amountMin     | decimal  | Нет          | Фильтр нижней границы суммы          |
+| amountMax     | decimal  | Нет          | Фильтр верхней границы суммы         |
+| currency      | string   | Нет          | Фильтр по валюте                     |
+| createdAfter  | DateTime | Нет          | Фильтр нижней границы даты создания  |
+| createdBefore | DateTime | Нет          | Фильтр верхней границы даты создания |
+| orderStatus   | string   | Нет          | Статус выплаты                       |
+| pageNumber    | int      | Нет          | Номер страницы                       |
+| pageSize      | int      | Нет          | Размер страницы                      |
+| fieldNameSort | string   | Нет          | Поле сортировки                      |
+| isDescSort    | boolean  | Нет          | Направление сортировки               |
+
+`orderStatus` может быть множественный - можно указать несколько статусов например `SUCCESS` и `CODE_RECEIVED` и
+принимает
+значения
+
+```
+CREATED - заявка создана(в текущей версии не используется)
+DETAILS_RECEIVED - переданы данные карты,
+WAITING_CODE - ожидается 3ds код от пользователя,
+CODE_RECEIVED - код получен
+SUCCESS - заявка закрыта успешно
+CANCELED - заявка закрыта НЕуспешно
+EXPIRED - заявка истекла(в текущей версии не используется)
+```
+
+Пример запроса:
+`/api/acquiring?timestamp=2024-05-04T13:55:11&orderStatus=PENDING&pageNumber=1&pageSize=10&fieldNameSort=externalId`
+
+Получает с 11 по 20 (`pageNumber=1&pageSize=10`) необработанные выплаты (`orderStatus=PENDING`) отсортированные по
+внешнему ключу
+заявки (`fieldNameSort=externalId`)
