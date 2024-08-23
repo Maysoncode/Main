@@ -619,7 +619,7 @@ EXPIRED - истекла
     "callbackUrl": "https://site.com/pay/result",
     "payoutMethod": "Тинькофф",
     "payoutInfo": "4644 4654 4546 3133",
-    "payoutExpirationDate": "25/05/2025"
+    "payoutExpirationDate": "05/2025"
 }
 ```
 
