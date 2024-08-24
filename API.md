@@ -96,7 +96,7 @@
 |-------------|------------------------|-----------------------------------------------------------|
 | UID         | Персональный ключ      | <code>e7742caf-5e74-498c-8f4f-d4ae0a6f2bf3</code>         |
 | PRIVATE_KEY | Приватный ключ         | <code>GJI/1MP8MvE/ODbnplDlnaQb8ZYQb8ZYIVSg+II6xnA=</code> |
-| api_server  | URL сервиса интеграции | <code>https://url-payment-sercive/api</code>               |
+| api_server  | URL сервиса интеграции | <code>http://url-payment-sercive/api</code>               |
 
 Для всей коллекции описан скрипт подписи каждого запроса. При необходимости можно сверяться с генерируемыми значениями
 
@@ -177,6 +177,13 @@
 | callbackUrl               | string  | Нет          | URL оповещения              |
 | clientInfo                | string  | Нет          | Информация о клиенте        |
 | paymentMethodDefinitionId | string  | Нет          | Идентификатор метода оплаты |
+| type                      | string  | Нет          | Тип метода оплаты           |
+
+Тип метода оплаты может принимать следующие значения
+```
+BANK_CARD_TRANSFER - перевод на банковскую карту
+TRANSFER_BY_NUMBER - перевод по номеру телефона
+```
 
 Пример запроса:
 `/api/order?timestamp=2024-05-04T12:38:25`
@@ -189,7 +196,8 @@
     "amount": 100,
     "currency": "USD",
     "callbackUrl": "https://site.com/pay/result",
-    "clientInfo": "User777"
+    "clientInfo": "User777",
+    "type": "BANK_CARD_TRANSFER"
 }
 ```
 
@@ -586,7 +594,8 @@ EXPIRED - истекла
 
 `POST /payout`
 
-* Желательно указывать информацию о методе выплаты(название банка, электронного кошелька, итд) в поле "payoutMethod" - (строка).
+* Желательно указывать информацию о методе выплаты(название банка, электронного кошелька, итд) в поле "payoutMethod" - (
+  строка).
 
 * В случае успеха, возвращается информация о выплате.
 
@@ -619,7 +628,7 @@ EXPIRED - истекла
     "callbackUrl": "https://site.com/pay/result",
     "payoutMethod": "Тинькофф",
     "payoutInfo": "4644 4654 4546 3133",
-    "payoutExpirationDate": "05/2025"
+    "payoutExpirationDate": "25/05/2025"
 }
 ```
 
