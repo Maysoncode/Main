@@ -117,7 +117,8 @@
 {
     "success": true,
     "result": {
-        "amount": 1251.00
+        "amount": 1251.00,
+        "currency": "USD"
     }
 }
 ```
@@ -241,7 +242,8 @@ TRANSFER_BY_NUMBER - перевод по номеру телефона
             }
         },
         "createdAt": "2024-05-04T15:34:55.56096812+03:00",
-        "status": "PENDING"
+        "status": "PENDING",
+        "currency": "USD"
     }
 }
 ```
@@ -376,7 +378,8 @@ EXPIRED - истекла
             }
         },
         "createdAt": "2024-05-04T13:32:06.505575Z",
-        "status": "PENDING"
+        "status": "PENDING",
+        "currency": "USD"
     }
 }
 ```
@@ -437,7 +440,8 @@ EXPIRED - истекла
             }
         },
         "createdAt": "2024-05-04T13:32:06.505575Z",
-        "status": "PENDING"
+        "status": "PENDING",
+        "currency": "USD"
     }
 }
 ```
@@ -571,7 +575,8 @@ EXPIRED - истекла
     }
   },
   "createdAt": "2024-05-04T15:34:55.56096812+03:00",
-  "status": "PENDING"
+  "status": "PENDING",
+  "currency": "USD"
 }
 ```
 
@@ -643,7 +648,8 @@ EXPIRED - истекла
         "amount": 10.00,
         "callbackUrl": "https://site.com/pay/result",
         "createdAt": "2024-05-17T16:09:29.492512093+03:00",
-        "status": "PENDING"
+        "status": "PENDING",
+        "currency": "USD"
     }
 }
 ```
@@ -715,7 +721,8 @@ EXPIRED - истекла
         "amount": 10.00,
         "callbackUrl": "https://site.com/pay/result",
         "createdAt": "2024-05-17T16:09:29.492512093+03:00",
-        "status": "PENDING"
+        "status": "PENDING",
+        "currency": "USD"
     }
 }
 ```
@@ -758,7 +765,8 @@ EXPIRED - истекла
         "amount": 10.00,
         "callbackUrl": "https://site.com/pay/result",
         "createdAt": "2024-05-17T16:09:29.492512093+03:00",
-        "status": "PENDING"
+        "status": "PENDING",
+        "currency": "USD"
     }
 }
 ```
