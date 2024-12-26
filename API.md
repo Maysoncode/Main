@@ -178,6 +178,7 @@
 | clientInfo                | string  | Нет          | Информация о клиенте        |
 | paymentMethodDefinitionId | string  | Нет          | Идентификатор метода оплаты |
 | type                      | string  | Нет          | Тип метода оплаты           |
+| conversionMethod          | string  | Нет          | Тип метода конвертации      |
 
 Тип метода оплаты может принимать следующие значения
 
