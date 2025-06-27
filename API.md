@@ -980,10 +980,7 @@ CANCELED - заявка закрыта НЕуспешно
         "clientInfo": "User777",
         "createdAt": "2024-06-28T15:45:02.968357964+03:00",
         "status": "DETAILS_RECEIVED",
-        "cardNumber": "123412******1234",
-        "cardExpirationDate": "12/2025",
-        "cardHolder": "IVAN IVANOV",
-        "cardCvv": "123"
+        "cardNumber": "123412******1234"
     }
 }
 ```
@@ -1171,10 +1168,7 @@ CANCELED - заявка закрыта НЕуспешно
         "clientInfo": "User777",
         "createdAt": "2024-06-28T15:45:02.968357964+03:00",
         "status": "DETAILS_RECEIVED",
-        "cardNumber": "123412******1234",
-        "cardExpirationDate": "12/2025",
-        "cardHolder": "IVAN IVANOV",
-        "cardCvv": "123"
+        "cardNumber": "123412******1234"
     }
 }
 ```
@@ -1288,10 +1282,7 @@ CANCELED - заявка закрыта НЕуспешно
         "clientInfo": "User777",
         "createdAt": "2024-06-28T12:45:02.968358Z",
         "status": "DETAILS_RECEIVED",
-        "cardNumber": "123412******1234",
-        "cardExpirationDate": "12/2025",
-        "cardHolder": "IVAN IVANOV",
-        "cardCvv": "123"
+        "cardNumber": "123412******1234"
     }
 }
 ```
@@ -1339,10 +1330,7 @@ CANCELED - заявка закрыта НЕуспешно
         "clientInfo": "User777",
         "createdAt": "2024-06-28T12:45:02.968358Z",
         "status": "DETAILS_RECEIVED",
-        "cardNumber": "123412******1234",
-        "cardExpirationDate": "12/2025",
-        "cardHolder": "IVAN IVANOV",
-        "cardCvv": "123"
+        "cardNumber": "123412******1234"
     }
 }
 ```
