@@ -958,7 +958,7 @@ CANCELED - заявка закрыта НЕуспешно
     "redirectUrl": "https://site.com/redirectUrl",
     "clientInfo": "User777",
     "cardNumber": "1234123412341234",
-    "cardExpirationDate": "12/2025",
+    "cardExpirationDate": "12/27",
     "cardHolder": "IVAN IVANOV",
     "cardCvv": "123"
 }
