@@ -1139,16 +1139,16 @@ CANCELED - заявка закрыта НЕуспешно
 Пример запроса:
 `/api/acquiring?timestamp=2024-05-04T12:38:25`
 
-#### Создание заявки
+#### Отправка данных карты по ранее созданной заявке
 
 ```<json>   
 {
-    "externalId": "37",
+    "id": "01dd1a6d-538a-4c4d-bb38-bc128d39f528",
     "amount": 100,
-    "currency": "USD",
-    "callbackUrl": "https://site.com/pay/result",
-    "payFormUrl": "site-pay.com/?id=01dd1a6d-538a-4c4d-bb38-bc128d39f528",
-    "clientInfo": "User777"
+    "cardNumber": "1234123412341234",
+    "cardExpirationDate": "12/25",
+    "cardHolder": "IVAN IVANOV",
+    "cardCvv": "123"
 }
 ```
 
@@ -1162,13 +1162,17 @@ CANCELED - заявка закрыта НЕуспешно
         "externalId": "37",
         "currencyCode": "USD",
         "amount": 100.00,
+        "merchantAmount": 95.00,
         "callbackUrl": "https://site.com/pay/result",
         "redirectUrl": "https://site.com/redirectUrl",
-        "payFormUrl": "site-pay.com/?id=01dd1a6d-538a-4c4d-bb38-bc128d39f528",
+        "payFormUrl": "bnn-pay.com/?id=01dd1a6d-538a-4c4d-bb38-bc128d39f528",
         "clientInfo": "User777",
         "createdAt": "2024-06-28T15:45:02.968357964+03:00",
         "status": "DETAILS_RECEIVED",
-        "cardNumber": "123412******1234"
+        "cardNumber": "1234123412341234",
+        "cardExpirationDate": "12/25",
+        "cardHolder": "IVAN IVANOV",
+        "cardCvv": "123"
     }
 }
 ```
