@@ -1137,7 +1137,7 @@ CANCELED - заявка закрыта НЕуспешно
 | cardCvv            | string  | Да           | CVV код карты                                                                                          |
 
 Пример запроса:
-`/api/acquiring?timestamp=2024-05-04T12:38:25`
+`/api/acquiring/send_card_data?timestamp=2024-05-04T12:38:25`
 
 #### Отправка данных карты по ранее созданной заявке
 
