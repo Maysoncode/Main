@@ -96,9 +96,40 @@
 |-------------|------------------------|-----------------------------------------------------------|
 | UID         | Персональный ключ      | <code>e7742caf-5e74-498c-8f4f-d4ae0a6f2bf3</code>         |
 | PRIVATE_KEY | Приватный ключ         | <code>GJI/1MP8MvE/ODbnplDlnaQb8ZYQb8ZYIVSg+II6xnA=</code> |
-| api_server  | URL сервиса интеграции | <code>https://url-payment-sercive.com/api</code>               |
+| api_server  | URL сервиса интеграции | <code>http://url-payment-sercive/api</code>               |
 
 Для всей коллекции описан скрипт подписи каждого запроса. При необходимости можно сверяться с генерируемыми значениями
+
+### Multipart-запрос (form-data)
+
+Используется для запросов с вложенными файлами (например, создание апелляции `POST /dispute`).
+
+| Параметр        | Описание                                                | Пример                                                          |
+|-----------------|---------------------------------------------------------|-----------------------------------------------------------------|
+| UID             | Персональный ключ                                       | <code>e7742caf-5e74-498c-8f4f-d4ae0a6f2bf3</code>               |
+| PRIVATE_KEY     | Приватный ключ                                          | <code>GJI/1MP8MvE/ODbnplDlnaQb8ZYQb8ZYIVSg+II6xnA=</code>       |
+| JSON_PART       | Содержимое части `json` запроса (строка UTF-8)          | <code>{"hash":"a7efd403-...","comment":"Платеж выполнен"}</code> |
+| FILE_1, FILE_2… | Файловые части запроса (каждый файл — отдельная часть) | бинарные данные файла                                           |
+
+**Алгоритм формирования PAYLOAD:**
+
+1. Извлечь содержимое части с именем `json` как строку в кодировке UTF-8.
+2. Для каждого файла (части с `submittedFileName != null`) вычислить MD5 его байтов — результат в lowercase hex (32 символа).
+3. Конкатенировать в порядке передачи: `PAYLOAD = json_content + md5hex(file1) + md5hex(file2) + ...`
+
+Подписью является MD5-HASH("{UID}:{PRIVATE_KEY}:{PAYLOAD}")
+
+Пример для запроса с одним файлом:
+
+```
+json часть: {"hash":"a7efd403-7d89-4b3c-9111-b5e3c79528e6","comment":"Платеж выполнен","callbackUrl":"https://site.com/dispute/callback","orderType":"IN"}
+MD5 файла:  d41d8cd98f00b204e9800998ecf8427e
+
+Тело подписи:
+e7742caf-5e74-498c-8f4f-d4ae0a6f2bf3:GJI/1MP8MvE/ODbnplDlnaQb8ZYQb8ZYIVSg+II6xnA=:{"hash":"a7efd403-7d89-4b3c-9111-b5e3c79528e6","comment":"Платеж выполнен","callbackUrl":"https://site.com/dispute/callback","orderType":"IN"}d41d8cd98f00b204e9800998ecf8427e
+```
+
+> ВНИМАНИЕ! Порядок файлов в multipart-запросе ВАЖЕН — MD5-хеши файлов конкатенируются строго в том порядке, в котором части передаются в запросе. Изменение порядка файлов приведёт к другой подписи и ошибке авторизации.
 
 ---
 
@@ -113,11 +144,12 @@
 
 Ответ (статус код 200):
 
-```
+```json
 {
     "success": true,
     "result": {
-        "amount": 1251.00
+        "amount": 1251.00,
+        "currency": "USD"
     }
 }
 ```
@@ -195,16 +227,16 @@
 
 Тело запроса:
 
-| Параметр                  | Тип     | Обязательный | Примечание                  |
-|---------------------------|---------|--------------|-----------------------------|
-| externalId                | string  | Да           | Внешний ключ заявки         |
-| amount                    | decimal | Да           | Сумма заявки                |
-| currency                  | string  | Да           | Код валюты заявки           |
-| callbackUrl               | string  | Нет          | URL оповещения              |
-| clientInfo                | string  | Нет          | Информация о клиенте        |
-| paymentMethodDefinitionId | string  | Нет          | Идентификатор метода оплаты |
-| type                      | string  | Нет          | Тип метода оплаты           |
-| conversionMethod          | string  | Нет          | Тип метода конвертации      |
+| Параметр                  | Тип     | Обязательный | Примечание                                                            |
+|---------------------------|---------|--------------|-----------------------------------------------------------------------|
+| externalId                | string  | Да           | Внешний ключ заявки                                                   |
+| amount                    | decimal | Да           | Сумма заявки                                                          |
+| currency                  | string  | Да           | Код валюты заявки                                                     |
+| callbackUrl               | string  | Нет          | URL оповещения                                                        |
+| clientInfo                | string  | Нет          | Информация о клиенте                                                  |
+| paymentMethodDefinitionId | string  | Нет          | Идентификатор метода оплаты                                           |
+| type                      | string  | Нет          | Тип метода оплаты                                                     |
+| conversionMethod          | string  | Нет          | Идентификатор метода конвертации валюты (для кросс-валютных заявок)   |
 
 Тип метода оплаты может принимать следующие значения
 
@@ -244,16 +276,22 @@ TRANSFER_BY_NUMBER - перевод по номеру телефона
 
 Ответ (статус код 200):
 
-```<json>   
+```json
 {
     "success": true,
     "result": {
         "hash": "a7efd403-7d89-4b3c-9111-b5e3c79528e6",
         "externalId": "111111112321341",
         "amount": 100.00,
+        "merchantAmount": 95.00,
+        "currency": "USD",
         "details": {
             "phoneNumber": "1",
-            "cardNumber": "2"
+            "cardNumber": "2",
+            "qr": null,
+            "ussd": null,
+            "cardHolder": null,
+            "secretCode": null
         },
         "callbackUrl": "https://site.com/pay/result",
         "clientInfo": "User777",
@@ -269,7 +307,11 @@ TRANSFER_BY_NUMBER - перевод по номеру телефона
             }
         },
         "createdAt": "2024-05-04T15:34:55.56096812+03:00",
-        "status": "PENDING"
+        "status": "PENDING",
+        "closeReasonCode": null,
+        "userCurrency": null,
+        "exchangeRate": null,
+        "secondAmount": null
     }
 }
 ```
@@ -280,10 +322,16 @@ TRANSFER_BY_NUMBER - перевод по номеру телефона
 
 * `hash` - идентификатор присвоенный заявке в нашей системе
 * `externalId` - идентификатор переданный внешней системой
+* `currency` - код валюты заявки
 * `details` - информация о реквизитах. В зависимости от типа оплаты будет указан номер карты `cardNumber` и\или номер
-  телефона `phoneNumber` по которым необходимо совершить платеж
+  телефона `phoneNumber` по которым необходимо совершить платеж. Дополнительно могут быть заполнены: `qr` (QR-код),
+  `ussd` (USSD-команда), `cardHolder` (держатель карты), `secretCode` (секретный код)
 * `paymentMethod` - информация о назначенном методе оплаты
 * `status` - статус заявки
+* `closeReasonCode` - код причины закрытия заявки (заполняется при завершении заявки)
+* `userCurrency` - расчётная валюта пользователя, в которой ведётся его баланс (заполняется для кросс-валютных заявок)
+* `exchangeRate` - коэффициент конвертации валюты пользователя в валюту заявки
+* `secondAmount` - сумма заявки в валюте пользователя
 
 статус может быть
 
@@ -379,16 +427,22 @@ EXPIRED - истекла
 
 Ответ (статус код 200):
 
-```<json>   
+```json
 {
     "success": true,
     "result": {
         "hash": "71ac21c7-d65b-47dd-89ad-17a441cb7838",
         "externalId": "111111112321344",
         "amount": 100.0000000000,
+        "merchantAmount": 95.0000000000,
+        "currency": "USD",
         "details": {
             "phoneNumber": "1",
-            "cardNumber": "2"
+            "cardNumber": "2",
+            "qr": null,
+            "ussd": null,
+            "cardHolder": null,
+            "secretCode": null
         },
         "callbackUrl": "https://site.com/pay/result",
         "clientInfo": "User777",
@@ -404,7 +458,11 @@ EXPIRED - истекла
             }
         },
         "createdAt": "2024-05-04T13:32:06.505575Z",
-        "status": "PENDING"
+        "status": "PENDING",
+        "closeReasonCode": null,
+        "userCurrency": null,
+        "exchangeRate": null,
+        "secondAmount": null
     }
 }
 ```
@@ -413,7 +471,7 @@ EXPIRED - истекла
 
 Ответ (статус код 4XX):
 
-```<json>   
+```json
 {
     "success": false,
     "error": [
@@ -440,16 +498,22 @@ EXPIRED - истекла
 
 Ответ (статус код 200):
 
-```<json>   
+```json
 {
     "success": true,
     "result": {
         "hash": "71ac21c7-d65b-47dd-89ad-17a441cb7838",
         "externalId": "111111112321344",
         "amount": 100.0000000000,
+        "merchantAmount": 95.0000000000,
+        "currency": "USD",
         "details": {
             "phoneNumber": "1",
-            "cardNumber": "2"
+            "cardNumber": "2",
+            "qr": null,
+            "ussd": null,
+            "cardHolder": null,
+            "secretCode": null
         },
         "callbackUrl": "https://site.com/pay/result",
         "clientInfo": "User777",
@@ -465,7 +529,11 @@ EXPIRED - истекла
             }
         },
         "createdAt": "2024-05-04T13:32:06.505575Z",
-        "status": "PENDING"
+        "status": "PENDING",
+        "closeReasonCode": null,
+        "userCurrency": null,
+        "exchangeRate": null,
+        "secondAmount": null
     }
 }
 ```
@@ -474,7 +542,7 @@ EXPIRED - истекла
 
 Ответ (статус код 4XX):
 
-```<json>   
+```json
 {
     "success": false,
     "error": [
@@ -522,20 +590,20 @@ EXPIRED - истекла
 
 **Параметры:** Штамп времени в строке запроса
 
-| Параметр      | Тип      | Обязательный | Примечание                           |
-|---------------|----------|--------------|--------------------------------------|
-| timestamp     | DateTime | Да           | Штамп времени                        |
-| hash          | string   | Нет          | Отфильтровать по хешу заявки         |
-| amountMin     | decimal  | Нет          | Фильтр нижней границы суммы          |
-| amountMax     | decimal  | Нет          | Фильтр верхней границы суммы         |
-| currency      | string   | Нет          | Фильтр по валюте                     |
-| createdAfter  | DateTime | Нет          | Фильтр нижней границы даты создания  |
-| createdBefore | DateTime | Нет          | Фильтр верхней границы даты создания |
-| orderStatus   | string   | Нет          | Статус заявки                        |
-| pageNumber    | int      | Нет          | Номер страницы                       |
-| pageSize      | int      | Нет          | Размер страницы                      |
-| fieldNameSort | string   | Нет          | Поле сортировки                      |
-| isDescSort    | boolean  | Нет          | Направление сортировки               |
+| Параметр      | Тип      | Обязательный | Примечание                                                       |
+|---------------|----------|--------------|------------------------------------------------------------------|
+| timestamp     | DateTime | Да           | Штамп времени                                                    |
+| hash          | string   | Нет          | Отфильтровать по хешу заявки                                     |
+| amountMin     | decimal  | Нет          | Фильтр нижней границы суммы                                      |
+| amountMax     | decimal  | Нет          | Фильтр верхней границы суммы                                     |
+| currency      | string[] | Нет          | Фильтр по валюте (можно указать несколько значений)              |
+| createdAfter  | DateTime | Нет          | Фильтр нижней границы даты создания                              |
+| createdBefore | DateTime | Нет          | Фильтр верхней границы даты создания                             |
+| orderStatus   | string   | Нет          | Статус заявки                                                    |
+| pageNumber    | int      | Нет          | Номер страницы                                                   |
+| pageSize      | int      | Нет          | Размер страницы                                                  |
+| fieldNameSort | string   | Нет          | Поле сортировки                                                  |
+| isDescSort    | boolean  | Нет          | Направление сортировки                                           |
 
 `orderStatus` может быть множественный - можно указать несколько статусов например `CANCELED` и `EXPIRED` и принимает
 значения
@@ -581,6 +649,7 @@ EXPIRED - истекла
   "hash": "a7efd403-7d89-4b3c-9111-b5e3c79528e6",
   "externalId": "111111112321341",
   "amount": 100.00,
+  "merchantAmount": 95.00,
   "details": {
     "phoneNumber": "1",
     "cardNumber": "2"
@@ -599,13 +668,64 @@ EXPIRED - истекла
     }
   },
   "createdAt": "2024-05-04T15:34:55.56096812+03:00",
-  "status": "PENDING"
+  "status": "PENDING",
+  "exchangeRate": 0.588,
+  "secondAmount": 58.79,
+  "userCurrency": "USD"
 }
 ```
 
 Запрос подписывается ключом api и секретом, по аналогии авторизации для вызова методов апи
 
 Для проверки корректности информации, **обязательно!** проверяйте хеш модели с хешем из заголовка "SIGNATURE"
+
+### Проверка подписи обратного вызова (Callback)
+
+При получении callback-запроса сервис отправляет следующие HTTP-заголовки:
+
+| Заголовок | Содержание                          |
+|-----------|-------------------------------------|
+| UID       | Персональный ключ мерчанта          |
+| SIGNATURE | MD5-подпись тела запроса            |
+
+**Формула подписи:**
+
+```
+SIGNATURE = MD5("{UID}:{PRIVATE_KEY}:{JSON_BODY}")
+```
+
+- `UID` — тот же персональный ключ, который используется для подписи запросов к API
+- `PRIVATE_KEY` — тот же приватный ключ (как в разделе «Авторизация»)
+- `JSON_BODY` — полное тело POST-запроса (JSON-строка, точно так же как была получена)
+
+**Пошаговый алгоритм проверки:**
+
+1. Извлечь значение заголовка `UID`
+2. Извлечь значение заголовка `SIGNATURE`
+3. Прочитать тело POST-запроса как строку (сырой JSON)
+4. Вычислить `expected = MD5("{UID}:{PRIVATE_KEY}:{JSON_BODY}")`
+5. Сравнить `expected` с полученным `SIGNATURE` — если совпадают, запрос подлинный
+
+**Псевдокод проверки:**
+
+```
+// Получен callback POST-запрос
+uid = headers["UID"]
+signature = headers["SIGNATURE"]
+body = readRequestBody()  // сырое тело запроса (JSON-строка)
+
+expected = MD5(uid + ":" + PRIVATE_KEY + ":" + body)
+
+if (expected == signature) {
+    // Подпись верна — обработать callback
+    return 200
+} else {
+    // Подпись не совпадает — отклонить
+    return 403
+}
+```
+
+> ПРИМЕЧАНИЕ: Данный механизм проверки идентичен для callback-уведомлений по обычным заявкам и по апелляциям (disputes).
 
 Варианты статуса заявки:
 
@@ -614,6 +734,11 @@ PENDING - исполняется
 SUCCESS - успешно,
 CANCELED - отклонена,
 EXPIRED - истекла
+```
+```
+userCurrency - рассчетная валюта пользователя, в которой ведется его баланс
+exchangeRate - коэфициент ковертации валюты пользователя в валюту заявки
+secondAmount - сумма заявки в валюте пользователя
 ```
 
 ## Методы заявок на выплату
@@ -641,6 +766,7 @@ EXPIRED - истекла
 | amount               | decimal | Да           | Сумма выплаты                                                                                        |
 | currency             | string  | Да           | Код валюты выплаты                                                                                   |
 | callbackUrl          | string  | Нет          | URL оповещения                                                                                       |
+| clientInfo           | string  | Нет          | Информация о клиенте                                                                                 |
 | payoutMethod         | string  | Нет          | Информация о методе выплаты(название банка итд)                                                      |
 | payoutInfo           | string  | Да           | Реквизиты для выплаты(номер карты, телефона итд)                                                     |
 | payoutExpirationDate | string  | Нет          | Дата окончания действия карты(необходима, когда способ выплаты требует это значение). Формат `MM/YY` |
@@ -664,16 +790,21 @@ EXPIRED - истекла
 
 Ответ (статус код 200):
 
-```<json>   
+```json
 {
     "success": true,
     "result": {
         "hash": "8d71eb70-6e4c-48dd-b32c-99db11907ee3",
         "externalId": "102",
         "amount": 10.00,
+        "merchantAmount": 10.50,
         "callbackUrl": "https://site.com/pay/result",
         "createdAt": "2024-05-17T16:09:29.492512093+03:00",
-        "status": "PENDING"
+        "status": "PENDING",
+        "closeReasonCode": null,
+        "userCurrency": null,
+        "exchangeRate": null,
+        "secondAmount": null
     }
 }
 ```
@@ -683,6 +814,10 @@ EXPIRED - истекла
 * `hash` - идентификатор присвоенный выплате в нашей системе
 * `externalId` - идентификатор переданный внешней системой
 * `status` - статус выплаты
+* `closeReasonCode` - код причины закрытия выплаты (заполняется при завершении заявки)
+* `userCurrency` - расчётная валюта пользователя (заполняется для кросс-валютных выплат)
+* `exchangeRate` - коэффициент конвертации валюты пользователя в валюту выплаты
+* `secondAmount` - сумма выплаты в валюте пользователя
 
 статус может быть
 
@@ -695,7 +830,7 @@ EXPIRED - истекла
 
 Ответ (статус код 4XX):
 
-```<json>   
+```json
 {
     "success": false,
     "error": [
@@ -709,7 +844,7 @@ EXPIRED - истекла
 
 Ответ (статус код 4XX):
 
-```<json>   
+```json
 {
     "success": false,
     "error": [
@@ -736,23 +871,28 @@ EXPIRED - истекла
 
 Ответ (статус код 200):
 
-```<json>   
+```json
 {
     "success": true,
     "result": {
         "hash": "8d71eb70-6e4c-48dd-b32c-99db11907ee3",
         "externalId": "102",
         "amount": 10.00,
+        "merchantAmount": 10.50,
         "callbackUrl": "https://site.com/pay/result",
         "createdAt": "2024-05-17T16:09:29.492512093+03:00",
-        "status": "PENDING"
+        "status": "PENDING",
+        "closeReasonCode": null,
+        "userCurrency": null,
+        "exchangeRate": null,
+        "secondAmount": null
     }
 }
 ```
 
 Ответ (статус код 4XX):
 
-```<json>   
+```json
 {
     "success": false,
     "error": [
@@ -779,23 +919,28 @@ EXPIRED - истекла
 
 Ответ (статус код 200):
 
-```<json>   
+```json
 {
     "success": true,
     "result": {
         "hash": "8d71eb70-6e4c-48dd-b32c-99db11907ee3",
         "externalId": "102",
         "amount": 10.00,
+        "merchantAmount": 10.50,
         "callbackUrl": "https://site.com/pay/result",
         "createdAt": "2024-05-17T16:09:29.492512093+03:00",
-        "status": "PENDING"
+        "status": "PENDING",
+        "closeReasonCode": null,
+        "userCurrency": null,
+        "exchangeRate": null,
+        "secondAmount": null
     }
 }
 ```
 
 Ответ (статус код 4XX):
 
-```<json>   
+```json
 {
     "success": false,
     "error": [
@@ -843,20 +988,20 @@ EXPIRED - истекла
 
 **Параметры:** Штамп времени в строке запроса
 
-| Параметр      | Тип      | Обязательный | Примечание                           |
-|---------------|----------|--------------|--------------------------------------|
-| timestamp     | DateTime | Да           | Штамп времени                        |
-| hash          | string   | Нет          | Отфильтровать по хешу выплаты        |
-| amountMin     | decimal  | Нет          | Фильтр нижней границы суммы          |
-| amountMax     | decimal  | Нет          | Фильтр верхней границы суммы         |
-| currency      | string   | Нет          | Фильтр по валюте                     |
-| createdAfter  | DateTime | Нет          | Фильтр нижней границы даты создания  |
-| createdBefore | DateTime | Нет          | Фильтр верхней границы даты создания |
-| orderStatus   | string   | Нет          | Статус выплаты                       |
-| pageNumber    | int      | Нет          | Номер страницы                       |
-| pageSize      | int      | Нет          | Размер страницы                      |
-| fieldNameSort | string   | Нет          | Поле сортировки                      |
-| isDescSort    | boolean  | Нет          | Направление сортировки               |
+| Параметр      | Тип      | Обязательный | Примечание                                                       |
+|---------------|----------|--------------|------------------------------------------------------------------|
+| timestamp     | DateTime | Да           | Штамп времени                                                    |
+| hash          | string   | Нет          | Отфильтровать по хешу выплаты                                    |
+| amountMin     | decimal  | Нет          | Фильтр нижней границы суммы                                      |
+| amountMax     | decimal  | Нет          | Фильтр верхней границы суммы                                     |
+| currency      | string[] | Нет          | Фильтр по валюте (можно указать несколько значений)              |
+| createdAfter  | DateTime | Нет          | Фильтр нижней границы даты создания                              |
+| createdBefore | DateTime | Нет          | Фильтр верхней границы даты создания                             |
+| orderStatus   | string   | Нет          | Статус выплаты                                                   |
+| pageNumber    | int      | Нет          | Номер страницы                                                   |
+| pageSize      | int      | Нет          | Размер страницы                                                  |
+| fieldNameSort | string   | Нет          | Поле сортировки                                                  |
+| isDescSort    | boolean  | Нет          | Направление сортировки                                           |
 
 `orderStatus` может быть множественный - можно указать несколько статусов например `CANCELED` и `EXPIRED` и принимает
 значения
@@ -880,10 +1025,10 @@ EXPIRED - истекла
 
 Эквайринг представляет собой заявку приема средств (PAY IN) со следующими шагами:
 
-* Клиент вводит реквизиты своей карты
-* Система создает заявку на снятие средств у клиента по переданным реквизитам
+* Клиент(игрок) вводит реквизиты своей карты
+* Система BNN создает заявку на снятие средств у клиента по переданным реквизитам
 * Клиент передает 3ds-код
-* Система вводит полученный от клиента код и подтверждает прием средств
+* Система BNN вводит полученный от клиента код и подтверждает прием средств
 
 Пояснения:
 
@@ -953,12 +1098,13 @@ CANCELED - заявка закрыта НЕуспешно
 {
     "externalId": "37",
     "amount": 100,
+    "merchantAmount": 95,
     "currency": "USD",
     "callbackUrl": "https://site.com/pay/result",
     "redirectUrl": "https://site.com/redirectUrl",
     "clientInfo": "User777",
     "cardNumber": "1234123412341234",
-    "cardExpirationDate": "12/27",
+    "cardExpirationDate": "12/25",
     "cardHolder": "IVAN IVANOV",
     "cardCvv": "123"
 }
@@ -966,7 +1112,7 @@ CANCELED - заявка закрыта НЕуспешно
 
 Ответ (статус код 200):
 
-```<json>   
+```json
 {
     "success": true,
     "result": {
@@ -974,13 +1120,18 @@ CANCELED - заявка закрыта НЕуспешно
         "externalId": "37",
         "currencyCode": "USD",
         "amount": 100.00,
+        "merchantAmount": 95.00,
         "callbackUrl": "https://site.com/pay/result",
         "redirectUrl": "https://site.com/redirectUrl",
-        "payFormUrl": "site-pay.com/?id=01dd1a6d-538a-4c4d-bb38-bc128d39f528",
+        "payFormUrl": "bnn-pay.com/?id=01dd1a6d-538a-4c4d-bb38-bc128d39f528",
         "clientInfo": "User777",
         "createdAt": "2024-06-28T15:45:02.968357964+03:00",
         "status": "DETAILS_RECEIVED",
-        "cardNumber": "123412******1234"
+        "cardNumber": "123456****1234",
+        "closeReasonCode": null,
+        "userCurrency": null,
+        "exchangeRate": null,
+        "secondAmount": null
     }
 }
 ```
@@ -990,10 +1141,15 @@ CANCELED - заявка закрыта НЕуспешно
 * `hash` - идентификатор присвоенный заявке в нашей системе
 * `externalId` - идентификатор переданный внешней системой
 * `status` - статус заявки `DETAILS_RECEIVED`
+* `cardNumber` - номер карты в маскированном формате: первые 6 цифр, затем `****`, затем последние 4 цифры (например `123456****1234`)
+* `closeReasonCode` - код причины закрытия заявки (заполняется при завершении заявки)
+* `userCurrency` - расчётная валюта пользователя (заполняется для кросс-валютных заявок)
+* `exchangeRate` - коэффициент конвертации валюты пользователя в валюту заявки
+* `secondAmount` - сумма заявки в валюте пользователя
 
 Ответ (статус код 4XX):
 
-```<json>   
+```json
 {
     "success": false,
     "error": [
@@ -1007,7 +1163,7 @@ CANCELED - заявка закрыта НЕуспешно
 
 Ответ (статус код 4XX):
 
-```<json>   
+```json
 {
     "success": false,
     "error": [
@@ -1060,7 +1216,7 @@ CANCELED - заявка закрыта НЕуспешно
 
 Ответ (статус код 200):
 
-```<json>   
+```json
 {
     "success": true,
     "result": {
@@ -1068,12 +1224,17 @@ CANCELED - заявка закрыта НЕуспешно
         "externalId": "37",
         "currencyCode": "USD",
         "amount": 100.00,
+        "merchantAmount": 95.00,
         "callbackUrl": "https://site.com/pay/result",
         "redirectUrl": "https://site.com/redirectUrl",
-        "payFormUrl": "site-pay.com/?id=01dd1a6d-538a-4c4d-bb38-bc128d39f528",
+        "payFormUrl": "bnn-pay.com/?id=01dd1a6d-538a-4c4d-bb38-bc128d39f528",
         "clientInfo": "User777",
         "createdAt": "2024-06-28T15:45:02.968357964+03:00",
-        "status": "CREATED"
+        "status": "CREATED",
+        "closeReasonCode": null,
+        "userCurrency": null,
+        "exchangeRate": null,
+        "secondAmount": null
     }
 }
 ```
@@ -1086,7 +1247,7 @@ CANCELED - заявка закрыта НЕуспешно
 
 Ответ (статус код 4XX):
 
-```<json>   
+```json
 {
     "success": false,
     "error": [
@@ -1100,7 +1261,7 @@ CANCELED - заявка закрыта НЕуспешно
 
 Ответ (статус код 4XX):
 
-```<json>   
+```json
 {
     "success": false,
     "error": [
@@ -1154,7 +1315,7 @@ CANCELED - заявка закрыта НЕуспешно
 
 Ответ (статус код 200):
 
-```<json>
+```json
 {
     "success": true,
     "result": {
@@ -1169,10 +1330,11 @@ CANCELED - заявка закрыта НЕуспешно
         "clientInfo": "User777",
         "createdAt": "2024-06-28T15:45:02.968357964+03:00",
         "status": "DETAILS_RECEIVED",
-        "cardNumber": "1234123412341234",
-        "cardExpirationDate": "12/25",
-        "cardHolder": "IVAN IVANOV",
-        "cardCvv": "123"
+        "cardNumber": "123456****1234",
+        "closeReasonCode": null,
+        "userCurrency": null,
+        "exchangeRate": null,
+        "secondAmount": null
     }
 }
 ```
@@ -1272,7 +1434,7 @@ CANCELED - заявка закрыта НЕуспешно
 
 Ответ (статус код 200):
 
-```<json>   
+```json
 {
     "success": true,
     "result": {
@@ -1280,20 +1442,25 @@ CANCELED - заявка закрыта НЕуспешно
         "externalId": "37",
         "currencyCode": "USD",
         "amount": 100.0000000000,
+        "merchantAmount": 95.0000000000,
         "callbackUrl": "https://site.com/pay/result",
         "redirectUrl": "https://site.com/redirectUrl",
-        "payFormUrl": "site-pay.com/?id=01dd1a6d-538a-4c4d-bb38-bc128d39f528",
+        "payFormUrl": "bnn-pay.com/?id=01dd1a6d-538a-4c4d-bb38-bc128d39f528",
         "clientInfo": "User777",
         "createdAt": "2024-06-28T12:45:02.968358Z",
         "status": "DETAILS_RECEIVED",
-        "cardNumber": "123412******1234"
+        "cardNumber": "123456****1234",
+        "closeReasonCode": null,
+        "userCurrency": null,
+        "exchangeRate": null,
+        "secondAmount": null
     }
 }
 ```
 
 Ответ (статус код 4XX):
 
-```<json>   
+```json
 {
     "success": false,
     "error": [
@@ -1320,7 +1487,7 @@ CANCELED - заявка закрыта НЕуспешно
 
 Ответ (статус код 200):
 
-```<json>   
+```json
 {
     "success": true,
     "result": {
@@ -1328,20 +1495,25 @@ CANCELED - заявка закрыта НЕуспешно
         "externalId": "37",
         "currencyCode": "USD",
         "amount": 100.0000000000,
+        "merchantAmount": 95.0000000000,
         "callbackUrl": "https://site.com/pay/result",
         "redirectUrl": "https://site.com/redirectUrl",
-        "payFormUrl": "site-pay.com/?id=01dd1a6d-538a-4c4d-bb38-bc128d39f528",
+        "payFormUrl": "bnn-pay.com/?id=01dd1a6d-538a-4c4d-bb38-bc128d39f528",
         "clientInfo": "User777",
         "createdAt": "2024-06-28T12:45:02.968358Z",
         "status": "DETAILS_RECEIVED",
-        "cardNumber": "123412******1234"
+        "cardNumber": "123456****1234",
+        "closeReasonCode": null,
+        "userCurrency": null,
+        "exchangeRate": null,
+        "secondAmount": null
     }
 }
 ```
 
 Ответ (статус код 4XX):
 
-```<json>   
+```json
 {
     "success": false,
     "error": [
@@ -1389,20 +1561,20 @@ CANCELED - заявка закрыта НЕуспешно
 
 **Параметры:** Штамп времени в строке запроса
 
-| Параметр      | Тип      | Обязательный | Примечание                           |
-|---------------|----------|--------------|--------------------------------------|
-| timestamp     | DateTime | Да           | Штамп времени                        |
-| hash          | string   | Нет          | Отфильтровать по хешу заявки         |
-| amountMin     | decimal  | Нет          | Фильтр нижней границы суммы          |
-| amountMax     | decimal  | Нет          | Фильтр верхней границы суммы         |
-| currency      | string   | Нет          | Фильтр по валюте                     |
-| createdAfter  | DateTime | Нет          | Фильтр нижней границы даты создания  |
-| createdBefore | DateTime | Нет          | Фильтр верхней границы даты создания |
-| orderStatus   | string   | Нет          | Статус заявки                        |
-| pageNumber    | int      | Нет          | Номер страницы                       |
-| pageSize      | int      | Нет          | Размер страницы                      |
-| fieldNameSort | string   | Нет          | Поле сортировки                      |
-| isDescSort    | boolean  | Нет          | Направление сортировки               |
+| Параметр      | Тип      | Обязательный | Примечание                                                       |
+|---------------|----------|--------------|------------------------------------------------------------------|
+| timestamp     | DateTime | Да           | Штамп времени                                                    |
+| hash          | string   | Нет          | Отфильтровать по хешу заявки                                     |
+| amountMin     | decimal  | Нет          | Фильтр нижней границы суммы                                      |
+| amountMax     | decimal  | Нет          | Фильтр верхней границы суммы                                     |
+| currency      | string[] | Нет          | Фильтр по валюте (можно указать несколько значений)              |
+| createdAfter  | DateTime | Нет          | Фильтр нижней границы даты создания                              |
+| createdBefore | DateTime | Нет          | Фильтр верхней границы даты создания                             |
+| orderStatus   | string   | Нет          | Статус заявки                                                    |
+| pageNumber    | int      | Нет          | Номер страницы                                                   |
+| pageSize      | int      | Нет          | Размер страницы                                                  |
+| fieldNameSort | string   | Нет          | Поле сортировки                                                  |
+| isDescSort    | boolean  | Нет          | Направление сортировки                                           |
 
 `orderStatus` может быть множественный - можно указать несколько статусов например `SUCCESS` и `CODE_RECEIVED`
 
@@ -1412,3 +1584,274 @@ CANCELED - заявка закрыта НЕуспешно
 Получает с 11 по 20 (`pageNumber=1&pageSize=10`) успешные заявки (`orderStatus=SUCCESS`) отсортированные по
 внешнему ключу
 заявки (`fieldNameSort=externalId`)
+
+-----------------------------------------------------
+
+## Методы для работы с апелляциями (Dispute)
+
+Апелляция позволяет мерчанту оспорить результат обработки заявки. К апелляции можно прикрепить файлы (скриншоты, видео и т.д.).
+
+Статус апелляции (`status`) может принимать значения:
+
+```
+OPEN                     - апелляция создана, ожидает рассмотрения
+WAITING_FOR_RESPONDENT   - ожидается ответ исполнителя (контрактора/матчера)
+RESOLVED                 - апелляция решена в пользу мерчанта
+REJECTED                 - апелляция отклонена
+```
+
+### Создать апелляцию
+
+`POST /dispute`
+
+* Content-Type: `multipart/form-data`
+* Запрос состоит из двух частей: `json` (JSON-строка с параметрами апелляции) и `files` (опционально, один или несколько файлов)
+* Для идентификации заявки необходимо передать хотя бы одно из полей: `hash` или `externalId`
+
+**Параметры:** Штамп времени в строке запроса
+
+Параметры части `json`:
+
+| Параметр    | Тип           | Обязательный | Примечание                                                          |
+|-------------|---------------|--------------|---------------------------------------------------------------------|
+| hash        | string (UUID) | Нет*         | Хеш связанной заявки                                                |
+| externalId  | string        | Нет*         | Внешний идентификатор связанной заявки                              |
+| comment     | string        | Нет          | Комментарий мерчанта                                                |
+| callbackUrl | string        | Нет          | URL для уведомлений об изменении статуса апелляции                  |
+| orderType   | string        | Да           | Тип заявки: `IN`, `OUT`, `ACQ`                                      |
+
+*Необходимо передать хотя бы одно из полей `hash` или `externalId`.
+
+Параметры части `files` (опционально):
+
+* Максимальный размер файла: 15 МБ
+* Допустимые форматы: JPEG, PNG, GIF, WebP, BMP, MP4, MOV, AVI, MKV, MPEG
+
+Пример запроса:
+`/api/dispute?timestamp=2024-05-04T12:38:25`
+
+#### Создание апелляции (часть json)
+
+```json
+{
+    "hash": "a7efd403-7d89-4b3c-9111-b5e3c79528e6",
+    "comment": "Платеж был выполнен, но заявка не подтверждена",
+    "callbackUrl": "https://site.com/dispute/callback",
+    "orderType": "IN"
+}
+```
+
+Ответ (статус код 200):
+
+```json
+{
+    "success": true,
+    "result": {
+        "id": "d1e2f3a4-b5c6-7890-abcd-ef1234567890",
+        "orderId": "a7efd403-7d89-4b3c-9111-b5e3c79528e6",
+        "orderType": "IN",
+        "merchantId": "c3d4e5f6-a7b8-9012-cdef-012345678901",
+        "status": "OPEN",
+        "comment": "Платеж был выполнен, но заявка не подтверждена",
+        "callbackUrl": "https://site.com/dispute/callback",
+        "files": [
+            {
+                "id": "f1e2d3c4-b5a6-7890-abcd-ef1234567890",
+                "name": "screenshot.png"
+            }
+        ],
+        "respondentComment": null,
+        "respondentFiles": [],
+        "createdAt": "2024-05-04T12:38:25.123456Z"
+    }
+}
+```
+
+В ответе возвращается информация по апелляции.
+
+* `id` - идентификатор апелляции в системе
+* `orderId` - идентификатор связанной заявки
+* `orderType` - тип заявки (`IN`, `OUT`, `ACQ`)
+* `merchantId` - идентификатор мерчанта
+* `status` - статус апелляции
+* `comment` - комментарий мерчанта
+* `callbackUrl` - URL для уведомлений
+* `files` - прикреплённые мерчантом файлы (массив объектов с полями `id` и `name`)
+* `respondentComment` - комментарий исполнителя (заполняется после ответа исполнителя)
+* `respondentFiles` - файлы исполнителя (заполняется после ответа исполнителя)
+* `createdAt` - дата и время создания апелляции
+
+Ответ (статус код 4XX) — апелляция по данной заявке уже существует:
+
+```json
+{
+    "success": false,
+    "error": {
+        "message": "Апелляция уже в работе",
+        "disputeId": "d1e2f3a4-b5c6-7890-abcd-ef1234567890"
+    }
+}
+```
+
+### Получить список апелляций
+
+`GET /dispute`
+
+* Все фильтры указываются в параметрах запроса
+* Из обязательных параметров только `timestamp`
+* Поддерживается пагинация через параметры `pageNumber` и `pageSize`
+
+**Параметры:** Штамп времени в строке запроса
+
+| Параметр   | Тип    | Обязательный | Примечание                                        |
+|------------|--------|--------------|---------------------------------------------------|
+| timestamp  | string | Да           | Штамп времени                                     |
+| status     | string | Нет          | Фильтр по статусу апелляции (StatusDispute)       |
+| orderType  | string | Нет          | Фильтр по типу заявки (`IN`, `OUT`, `ACQ`)        |
+| pageNumber | int    | Нет          | Номер страницы                                    |
+| pageSize   | int    | Нет          | Размер страницы                                   |
+
+Пример запроса:
+`/api/dispute?timestamp=2024-05-04T13:55:11&status=OPEN&pageNumber=0&pageSize=10`
+
+Ответ (статус код 200):
+
+```json
+{
+    "success": true,
+    "result": {
+        "elements": [
+            {
+                "id": "d1e2f3a4-b5c6-7890-abcd-ef1234567890",
+                "orderId": "a7efd403-7d89-4b3c-9111-b5e3c79528e6",
+                "orderType": "IN",
+                "merchantId": "c3d4e5f6-a7b8-9012-cdef-012345678901",
+                "status": "OPEN",
+                "comment": "Платеж был выполнен, но заявка не подтверждена",
+                "callbackUrl": "https://site.com/dispute/callback",
+                "files": [],
+                "respondentComment": null,
+                "respondentFiles": [],
+                "createdAt": "2024-05-04T12:38:25.123456Z"
+            }
+        ],
+        "totalElements": 1,
+        "totalPages": 1,
+        "currentPages": 0
+    }
+}
+```
+
+### Получить апелляцию по заявке
+
+`GET /dispute/by_order`
+
+* Возвращает апелляцию, связанную с указанной заявкой
+* Необходимо передать хотя бы одно из полей: `hash` или `externalId`
+
+**Параметры:** Штамп времени в строке запроса
+
+| Параметр   | Тип           | Обязательный | Примечание                             |
+|------------|---------------|--------------|----------------------------------------|
+| timestamp  | string        | Да           | Штамп времени                          |
+| hash       | string (UUID) | Нет*         | Хеш связанной заявки                   |
+| externalId | string        | Нет*         | Внешний идентификатор связанной заявки |
+
+*Необходимо передать хотя бы одно из полей `hash` или `externalId`.
+
+Пример запроса:
+`/api/dispute/by_order?timestamp=2024-05-04T13:24:42&hash=a7efd403-7d89-4b3c-9111-b5e3c79528e6`
+
+Ответ (статус код 200):
+
+```json
+{
+    "success": true,
+    "result": {
+        "id": "d1e2f3a4-b5c6-7890-abcd-ef1234567890",
+        "orderId": "a7efd403-7d89-4b3c-9111-b5e3c79528e6",
+        "orderType": "IN",
+        "merchantId": "c3d4e5f6-a7b8-9012-cdef-012345678901",
+        "status": "OPEN",
+        "comment": "Платеж был выполнен, но заявка не подтверждена",
+        "callbackUrl": "https://site.com/dispute/callback",
+        "files": [],
+        "respondentComment": null,
+        "respondentFiles": [],
+        "createdAt": "2024-05-04T12:38:25.123456Z"
+    }
+}
+```
+
+### Получить апелляцию по идентификатору
+
+`GET /dispute/{id}`
+
+* Параметр `id` — идентификатор апелляции (UUID), указывается в строке запроса
+
+Пример запроса:
+`/api/dispute/d1e2f3a4-b5c6-7890-abcd-ef1234567890?timestamp=2024-05-04T13:24:42`
+
+Ответ (статус код 200):
+
+```json
+{
+    "success": true,
+    "result": {
+        "id": "d1e2f3a4-b5c6-7890-abcd-ef1234567890",
+        "orderId": "a7efd403-7d89-4b3c-9111-b5e3c79528e6",
+        "orderType": "IN",
+        "merchantId": "c3d4e5f6-a7b8-9012-cdef-012345678901",
+        "status": "WAITING_FOR_RESPONDENT",
+        "comment": "Платеж был выполнен, но заявка не подтверждена",
+        "callbackUrl": "https://site.com/dispute/callback",
+        "files": [
+            {
+                "id": "f1e2d3c4-b5a6-7890-abcd-ef1234567890",
+                "name": "screenshot.png"
+            }
+        ],
+        "respondentComment": null,
+        "respondentFiles": [],
+        "createdAt": "2024-05-04T12:38:25.123456Z"
+    }
+}
+```
+
+Ответ (статус код 4XX):
+
+```json
+{
+    "success": false,
+    "error": [
+        {
+            "errorType": "VALIDATION",
+            "message": "Апелляция не найдена в системе"
+        }
+    ]
+}
+```
+
+### Скачать файл апелляции
+
+`GET /dispute/{id}/files/{fileId}`
+
+* Параметр `id` — идентификатор апелляции (UUID)
+* Параметр `fileId` — идентификатор файла (UUID)
+* Возвращает бинарный поток файла (`application/octet-stream`)
+
+Пример запроса:
+`/api/dispute/d1e2f3a4-b5c6-7890-abcd-ef1234567890/files/f1e2d3c4-b5a6-7890-abcd-ef1234567890?timestamp=2024-05-04T13:24:42`
+
+Ответ (статус код 200): бинарный поток файла
+
+Ответ (статус код 4XX):
+
+```json
+{
+    "success": false,
+    "error": [
+        "Файл не найден в системе"
+    ]
+}
+```
