@@ -1098,7 +1098,6 @@ CANCELED - заявка закрыта НЕуспешно
 {
     "externalId": "37",
     "amount": 100,
-    "merchantAmount": 95,
     "currency": "USD",
     "callbackUrl": "https://site.com/pay/result",
     "redirectUrl": "https://site.com/redirectUrl",
@@ -1199,7 +1198,7 @@ CANCELED - заявка закрыта НЕуспешно
 | clientInfo  | string  | Нет          | Информация о клиенте(опциональная информация о клиенте) |
 
 Пример запроса:
-`/api/acquiring?timestamp=2024-05-04T12:38:25`
+`/api/acquiring/cardless?timestamp=2024-05-04T12:38:25`
 
 #### Создание заявки
 
@@ -1387,7 +1386,7 @@ CANCELED - заявка закрыта НЕуспешно
 | code     | string | Да           | 3ds код    |
 
 Пример запроса:
-`/api/acquiring?timestamp=2024-05-04T13:24:42`
+`/api/acquiring/code?timestamp=2024-05-04T13:24:42`
 
 ```<json>   
 {
@@ -1579,7 +1578,7 @@ CANCELED - заявка закрыта НЕуспешно
 `orderStatus` может быть множественный - можно указать несколько статусов например `SUCCESS` и `CODE_RECEIVED`
 
 Пример запроса:
-`/api/acquiring?timestamp=2024-05-04T13:55:11&orderStatus=PENDING&pageNumber=1&pageSize=10&fieldNameSort=externalId`
+`/api/acquiring?timestamp=2024-05-04T13:55:11&orderStatus=SUCCESS&pageNumber=1&pageSize=10&fieldNameSort=externalId`
 
 Получает с 11 по 20 (`pageNumber=1&pageSize=10`) успешные заявки (`orderStatus=SUCCESS`) отсортированные по
 внешнему ключу
